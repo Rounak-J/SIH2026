@@ -1,0 +1,116 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    {
+      "type": "cryptographic-asset",
+      "name": "TLS 1.0",
+      "cryptoProperties": {
+        "assetType": "Protocol",
+        "algorithm": "TLS 1.0",
+        "quantumRiskLevel": "Critical",
+        "remediation": "Upgrade to TLS 1.3"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "DES",
+      "cryptoProperties": {
+        "assetType": "Symmetric Cipher",
+        "algorithm": "DES",
+        "quantumRiskLevel": "Critical",
+        "remediation": "Deprecate immediately, upgrade to AES-256-GCM"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "DES",
+      "cryptoProperties": {
+        "assetType": "Symmetric Cipher",
+        "algorithm": "DES",
+        "quantumRiskLevel": "Critical",
+        "remediation": "Deprecate immediately, upgrade to AES-256-GCM"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "RSA",
+      "cryptoProperties": {
+        "assetType": "Asymmetric Key Exchange",
+        "algorithm": "RSA",
+        "quantumRiskLevel": "Critical",
+        "remediation": "Migrate to ML-KEM-768 (NIST FIPS 203)"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "ECC",
+      "cryptoProperties": {
+        "assetType": "Asymmetric Key Exchange",
+        "algorithm": "ECC",
+        "quantumRiskLevel": "Critical",
+        "remediation": "Migrate to ML-DSA-65 (NIST FIPS 204)"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "ECC",
+      "cryptoProperties": {
+        "assetType": "Asymmetric Key Exchange",
+        "algorithm": "ECC",
+        "quantumRiskLevel": "Critical",
+        "remediation": "Migrate to ML-DSA-65 (NIST FIPS 204)"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "SHA-1",
+      "cryptoProperties": {
+        "assetType": "Hash Function",
+        "algorithm": "SHA-1",
+        "quantumRiskLevel": "High",
+        "remediation": "Deprecate immediately, use SHA-256 / SHA-3"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "ECC",
+      "cryptoProperties": {
+        "assetType": "Asymmetric Key Exchange",
+        "algorithm": "ECC",
+        "quantumRiskLevel": "Critical",
+        "remediation": "Migrate to ML-DSA-65 (NIST FIPS 204)"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "AES-256",
+      "cryptoProperties": {
+        "assetType": "Symmetric Cipher",
+        "algorithm": "AES-256",
+        "quantumRiskLevel": "Safe",
+        "remediation": "Retain AES-256-GCM (Quantum-Resistant)"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "RSA",
+      "cryptoProperties": {
+        "assetType": "Asymmetric Key Exchange",
+        "algorithm": "RSA",
+        "quantumRiskLevel": "Critical",
+        "remediation": "Migrate to ML-KEM-768 (NIST FIPS 203)"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "MD5",
+      "cryptoProperties": {
+        "assetType": "Hash Function",
+        "algorithm": "MD5",
+        "quantumRiskLevel": "Critical",
+        "remediation": "Deprecate immediately, use SHA-256 / SHA-3"
+      }
+    }
+  ]
+}

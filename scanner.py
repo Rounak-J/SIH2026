@@ -1,132 +1,60 @@
-# scanner.py
-import re
 import os
+import re
 
-# Knowledge base: algorithm, quantum risk level, and NIST replacement
-CRYPTO_RULES = {
-    "RSA": {
-        "pattern": r"(RSA\.generate|from.*RSA|import.*rsa)",
-        "type": "Asymmetric Key",
-        "quantum_risk": "High",
-        "recommendation": "Migrate to ML-KEM-768 (NIST FIPS 203)"
-    },
-    "AES-256": {
-        "pattern": r"(AES\.new.*MODE|AES)",
-        "type": "Symmetric Cipher",
-        "quantum_risk": "Safe",
-        "recommendation": "Retain AES-256 (Quantum-Resistant)"
-    },
-    "ECC": {
-        "pattern": r"(ECC\.generate|EllipticCurve|ECDSA)",
-        "type": "Digital Signature",
-        "quantum_risk": "High",
-        "recommendation": "Migrate to ML-DSA-65 (NIST FIPS 204)"
-    },
-    "MD5": {
-        "pattern": r"(hashlib\.md5|md5)",
-        "type": "Hash Function",
-        "quantum_risk": "Critical",
-        "recommendation": "Deprecate immediately"
-    }
-}
-
-def scan_directory(target_dir):
-    findings = []
-    
-    # Gracefully handle invalid directories
-    if not os.path.exists(target_dir):
+class CryptoScanner:
+    def __init__(self):
+        # Cryptographic Rule Dictionary based on standard specs
+        self.rules = {
+            'RSA': {'pattern': r'(RSA\.generate|generate_private_key|RSA_generate_key)', 'type': 'Asymmetric Key Exchange'},
+            'ECC': {'pattern': r'(ECC\.generate|EllipticCurve|ECDSA|EC_KEY_new|getInstance\("EC"\))', 'type': 'Asymmetric Key Exchange'},
+            'DH': {'pattern': r'(DH_generate_parameters|DiffieHellman)', 'type': 'Asymmetric Key Exchange'},
+            'AES-256': {'pattern': r'(AES\.new.*256|AES\.MODE_GCM|AES-256-GCM)', 'type': 'Symmetric Cipher'},
+            'AES-128': {'pattern': r'(AES\.new.*128|AES-128)', 'type': 'Symmetric Cipher'},
+            'DES': {'pattern': r'(DES_cblock|DES_set_key)', 'type': 'Symmetric Cipher'},
+            'MD5': {'pattern': r'(md5\(|MD5)', 'type': 'Hash Function'},
+            'SHA-1': {'pattern': r'(sha1\(|SHA-1|SHA1)', 'type': 'Hash Function'},
+            'TLS 1.0': {'pattern': r'TLSv1\.0', 'type': 'Protocol'}
+        }
+        
+    def scan_directory(self, target_dir):
+        findings = []
+        valid_exts = ['.py', '.java', '.c', '.cpp', '.go', '.js']
+        
+        for root, _, files in os.walk(target_dir):
+            for file in files:
+                ext = os.path.splitext(file)[1]
+                if ext in valid_exts or file == 'Dockerfile':
+                    file_path = os.path.join(root, file)
+                    findings.extend(self.scan_file(file_path))
         return findings
 
-    for root, _, files in os.walk(target_dir):
-        for file in files:
-            # Scan common source code files
-            if file.endswith((".py", ".java", ".c", ".cpp", ".go", ".js")):
-                filepath = os.path.join(root, file)
-                try:
-                    with open(filepath, "r", errors="ignore") as f:
-                        for line_num, line in enumerate(f, 1):
-                            for algo, details in CRYPTO_RULES.items():
-                                if re.search(details["pattern"], line, re.IGNORECASE):
-                                    findings.append({
-                                        "FILE PATH": f"{file} (Line {line_num})",
-                                        "ARTEFACT": algo,
-                                        "TYPE": details["type"],
-                                        "RISK LEVEL": details["quantum_risk"],
-                                        "REMEDIATION STRATEGY": details["recommendation"]
-                                    })
-                except Exception:
-                    pass # Skip unreadable files
-                    
-    return findings
-import os
-import re
-
-# ==========================================================
-# STEPS 4 & 6: THREAT & NIST PQC KNOWLEDGE BASE (LOOKUP TABLE)
-# ==========================================================
-CRYPTO_KNOWLEDGE_BASE = {
-    "RSA": {
-        "pattern": r"(RSA\.generate|from.*RSA|import.*rsa|generate_private_key.*rsa)",
-        "primitive_type": "Asymmetric Key Exchange / Encryption",
-        "threat_vector": "Shor's Algorithm (Integer Factorization)",
-        "quantum_risk": "🔴 Critical Risk",
-        "pqc_standard": "NIST FIPS 203 (ML-KEM-768 / Kyber)"
-    },
-    "ECC": {
-        "pattern": r"(ECC\.generate|EllipticCurve|ECDSA|SECP256R1)",
-        "primitive_type": "Asymmetric Digital Signature",
-        "threat_vector": "Shor's Algorithm (Discrete Logarithm)",
-        "quantum_risk": "🔴 Critical Risk",
-        "pqc_standard": "NIST FIPS 204 (ML-DSA-65 / Dilithium)"
-    },
-    "AES": {
-        "pattern": r"(AES\.new|Cipher.*AES)",
-        "primitive_type": "Symmetric Cipher",
-        "threat_vector": "Grover's Algorithm (Quadratic Search)",
-        "quantum_risk": "🟢 Quantum-Safe (if key >= 256-bit)",
-        "pqc_standard": "Retain AES-256-GCM"
-    }
-}
-
-# ==========================================================
-# STEP 5: MOSCA'S THEOREM ENGINE
-# ==========================================================
-def calculate_mosca(shelf_life_x=10, migration_time_y=3, quantum_horizon_z=7):
-    """Evaluates (X + Y) > Z condition."""
-    is_danger = (shelf_life_x + migration_time_y) > quantum_horizon_z
-    return "🚨 CRITICAL DANGER ZONE" if is_danger else "✅ SAFE WINDOW"
-
-# ==========================================================
-# STEPS 1, 2, 3: DETECTION & METADATA EXTRACTION
-# ==========================================================
-def scan_directory(target_path, x=10, y=3, z=7):
-    cbom_records = []
-    mosca_status = calculate_mosca(x, y, z)
-
-    for root, _, files in os.walk(target_path):
-        for file in files:
-            if file.endswith((".py", ".java", ".c", ".cpp", ".js")):
-                full_path = os.path.join(root, file)
+    def scan_file(self, file_path):
+        findings = []
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
                 
-                with open(full_path, "r", errors="ignore") as f:
-                    for line_num, line in enumerate(f, 1):
-                        clean_line = line.strip()
-
-                        # Step 2: AST / False-Positive Guard (Ignore comments)
-                        if clean_line.startswith(("#", "//", "/*", "*")):
-                            continue
-
-                        # Step 1 & 3: Regex Match & Metadata Extraction
-                        for algo_name, rules in CRYPTO_KNOWLEDGE_BASE.items():
-                            if re.search(rules["pattern"], clean_line, re.IGNORECASE):
-                                cbom_records.append({
-                                    "File": file,
-                                    "Line": line_num,
-                                    "Detected Primitive": algo_name,
-                                    "Primitive Type": rules["primitive_type"],
-                                    "Threat Vector": rules["threat_vector"],
-                                    "Quantum Risk": rules["quantum_risk"],
-                                    "Mosca Status": mosca_status,
-                                    "PQC Recommendation": rules["pqc_standard"]
-                                })
-    return cbom_records
+            in_block_comment = False
+            for i, line in enumerate(lines):
+                # Basic context guard for comments
+                stripped = line.strip()
+                if stripped.startswith('/*'): in_block_comment = True
+                if in_block_comment and '*/' in stripped: 
+                    in_block_comment = False
+                    continue
+                if in_block_comment or stripped.startswith('//') or stripped.startswith('#'):
+                    continue
+                    
+                for artefact, rule in self.rules.items():
+                    if re.search(rule['pattern'], line, re.IGNORECASE):
+                        findings.append({
+                            "file_path": file_path,
+                            "line_number": i + 1,
+                            "raw_code": line.strip(),
+                            "artefact": artefact,
+                            "type": rule['type'],
+                            "key_length": "Variable" # Simplified for this demo
+                        })
+        except Exception as e:
+            pass # Ignore unreadable files in prototype
+        return findings
