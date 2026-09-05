@@ -1,0 +1,7 @@
+# This is a dummy file containing a fake private key for testing the ECDAT scanner.
+
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA3Tz2mr7SZiAMfQyuvBjM9XiLFA3x0G5O0d9jK5T9wRzY3z+v
+/8Y+Z6J8xQ3+n2X2m9t6B+Y1Y4h7Q9f7z6X2M5t3P9k0r8N7J9o2L9c5H2p4V8a1
+... (this is just a dummy key) ...
+-----END RSA PRIVATE KEY-----

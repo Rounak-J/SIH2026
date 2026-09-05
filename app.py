@@ -8,6 +8,7 @@ from datetime import datetime
 from scanner import CryptoScanner
 from risk_engine import evaluate_finding, evaluate_mosca
 from cbom_generator import generate_cyclonedx, generate_pdf_report
+from network_scanner import NetworkScanner
 
 st.set_page_config(
     page_title="S.Q.A.N.", 
@@ -62,31 +63,19 @@ st.markdown("""
         font-weight: 600 !important;
         letter-spacing: 0.5px;
     }
-    
-    div[role="radiogroup"] > label > div:first-child {
-        display: none;
-    }
-    div[role="radiogroup"] > label {
-        padding: 0.5rem 1rem;
-        margin-bottom: 0.25rem;
-        border-radius: 0.25rem;
-        background-color: transparent;
-        transition: all 0.2s;
-    }
-    div[role="radiogroup"] > label:hover {
-        background-color: #1a1e29;
-    }
-    div[role="radiogroup"] > label[data-checked="true"] {
-        background-color: #1f2330;
-        border-left: 3px solid #00d2ff;
-    }
-</style>
-""", unsafe_allow_html=True)
+    </style>
+    """, unsafe_allow_html=True)
 
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
 if 'scan_completed' not in st.session_state:
     st.session_state['scan_completed'] = False
+if 'mosca_x' not in st.session_state:
+    st.session_state['mosca_x'] = 10
+if 'mosca_y' not in st.session_state:
+    st.session_state['mosca_y'] = 3
+if 'mosca_z' not in st.session_state:
+    st.session_state['mosca_z'] = 7
 
 # LOGIN
 if not st.session_state['authenticated']:
@@ -164,23 +153,46 @@ else:
         st.divider()
         with st.container(border=True):
             st.markdown("##### Scan Configuration")
-            col_cfg1, col_cfg2, col_cfg3 = st.columns([3, 1, 1])
-            with col_cfg1:
-                target_dir = st.text_input("TARGET PATH", value=os.path.abspath("sample_codebase"), label_visibility="collapsed")
-            with col_cfg2:
-                scan_mode = st.selectbox("ANALYSIS MODE", ["DEEP AST", "FAST REGEX", "BINARY ANALYSIS"], label_visibility="collapsed")
-            with col_cfg3:
+            
+            t_col1, t_col2 = st.columns(2)
+            with t_col1: target_type = st.radio("TARGET TYPE", ["Local Codebase", "Live Network URL"], horizontal=True, label_visibility="collapsed")
+            with t_col2: 
+                if target_type == "Local Codebase":
+                    scan_mode = st.selectbox("ANALYSIS MODE", ["DEEP AST", "FAST REGEX", "BINARY ANALYSIS"], label_visibility="collapsed")
+                else:
+                    st.selectbox("ANALYSIS MODE", ["NETWORK TLS PROBE"], disabled=True, label_visibility="collapsed")
+                    scan_mode = "NETWORK TLS PROBE"
+                    
+            c_col1, c_col2 = st.columns(2)
+            with c_col1: criticality = st.selectbox("BUSINESS CRITICALITY", ["Internal / Low Risk", "Core Operational", "Mission Critical"], label_visibility="collapsed")
+            with c_col2: compliance = st.selectbox("COMPLIANCE STANDARD", ["Standard Industry Baseline", "NSA CNSA 2.0 (Military Grade)"], label_visibility="collapsed")
+            
+            p_col1, p_col2 = st.columns([4, 1])
+            with p_col1:
+                if target_type == "Local Codebase":
+                    target_dir = st.text_input("TARGET PATH", value=os.path.abspath("dummy_repo"), label_visibility="collapsed")
+                else:
+                    target_dir = st.text_input("NETWORK URL", value="google.com", label_visibility="collapsed")
+            with p_col2:
                 run_scan = st.button("EXECUTE SCAN", use_container_width=True)
                 
         if run_scan:
-            with st.spinner("Initializing parallel analysis engines... scanning codebase..."):
+            with st.spinner("Initializing analysis engines..."):
                 time.sleep(1)
-                scanner = CryptoScanner()
-                raw_findings = scanner.scan_directory(target_dir)
+                
+                # Save criticality for the Mosca Simulator
+                st.session_state['criticality'] = criticality
+                
+                if target_type == "Local Codebase":
+                    scanner = CryptoScanner(mode=scan_mode)
+                    raw_findings = scanner.scan_directory(target_dir)
+                else:
+                    net_scanner = NetworkScanner()
+                    raw_findings = net_scanner.scan_url(target_dir)
                 
                 enriched_findings = []
                 for f in raw_findings:
-                    eval_data = evaluate_finding(f['artefact'])
+                    eval_data = evaluate_finding(f['artefact'], compliance_mode=compliance)
                     f['risk'] = eval_data['risk']
                     f['remediation'] = eval_data['remediation']
                     enriched_findings.append({
@@ -199,6 +211,21 @@ else:
                 st.session_state['enriched_findings'] = enriched_findings
                 st.session_state['raw_findings'] = raw_findings
                 st.session_state['scan_completed'] = True
+                
+                # Force update the Mosca simulator inputs based on new findings!
+                critical_risk_count = sum(1 for f in enriched_findings if f['RISK LEVEL'] in ['Critical', 'High'])
+                has_asym = any(f['TYPE'] == 'Asymmetric Key Exchange' for f in enriched_findings)
+                st.session_state['mosca_y'] = min(15, 1 + int(0.5 * critical_risk_count))
+                
+                # Apply Business Criticality modifier to Shelf Life (X)
+                base_x = 15 if has_asym else 5
+                criticality_val = st.session_state.get('criticality', 'Internal / Low Risk')
+                if criticality_val == 'Mission Critical':
+                    base_x += 5
+                elif criticality_val == 'Core Operational':
+                    base_x += 2
+                    
+                st.session_state['mosca_x'] = base_x
 
         if st.session_state.get('scan_completed', False):
             enriched_findings = st.session_state.get('enriched_findings', [])
@@ -231,17 +258,53 @@ else:
             with col_chart2:
                 with st.container(border=True):
                     st.markdown("##### Mosca's Risk Simulator (X + Y > Z)")
+                    
+                    x_val = st.session_state['mosca_x']
+                    y_val = st.session_state['mosca_y']
+                    z_val = st.session_state['mosca_z']
+                    
                     c1, c2, c3 = st.columns(3)
-                    with c1: x_val = st.number_input("SHELF-LIFE (X)", 1, 30, 10)
-                    with c2: y_val = st.number_input("MIGRATION (Y)", 1, 15, 3)
-                    with c3: z_val = st.number_input("HORIZON (Z)", 1, 30, 7)
+                    c1.metric("SHELF-LIFE (X)", f"{x_val} yrs")
+                    c2.metric("MIGRATION (Y)", f"{y_val} yrs")
+                    c3.metric("Q-DAY HORIZON (Z)", f"{z_val} yrs")
                     
                     is_danger, exposure = evaluate_mosca(x_val, y_val, z_val)
                     total_time = x_val + y_val
                     if is_danger: st.error(f"CRITICAL EXPOSURE: X + Y ({total_time} yrs) > Z ({z_val} yrs) [Window: {exposure}y]")
                     else: st.success(f"SECURE: X + Y ({total_time} yrs) ≤ Z ({z_val} yrs)")
 
-            st.markdown("<br>", unsafe_allow_html=True)
+            st.divider()
+            
+            # --- Visual Threat Graph ---
+            st.markdown("### Visual Threat Topology")
+            if len(enriched_findings) > 0:
+                dot = "digraph {\n"
+                dot += 'node [shape=box, style=filled, color="#2E3A59", fontcolor=white, fontname="Helvetica"];\n'
+                dot += 'edge [color="#6B7280"];\n'
+                dot += 'rankdir=LR;\n'
+                
+                added_nodes = set()
+                for f in enriched_findings:
+                    fpath = f['FILE PATH'].split('/')[-1].split('\\')[-1]
+                    vuln = f['ARTEFACT']
+                    risk = f['RISK LEVEL']
+                    
+                    if fpath not in added_nodes:
+                        dot += f'"{fpath}" [shape=note, color="#374151"];\n'
+                        added_nodes.add(fpath)
+                    if vuln not in added_nodes:
+                        color = "#EF4444" if risk == "Critical" else "#F59E0B" if risk == "High" else "#10B981" if risk == "Safe" else "#3B82F6"
+                        dot += f'"{vuln}" [color="{color}"];\n'
+                        added_nodes.add(vuln)
+                    
+                    dot += f'"{fpath}" -> "{vuln}";\n'
+                dot += "}"
+                
+                st.graphviz_chart(dot)
+            else:
+                st.info("No threats to visualize.")
+                
+            st.divider()
             st.markdown("### Critical Discoveries")
             df = pd.DataFrame(enriched_findings)
             def color_risk(val):
